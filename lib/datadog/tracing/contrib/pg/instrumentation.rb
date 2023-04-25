@@ -33,8 +33,18 @@ module Datadog
             end
 
             def exec_prepared(statement_name, params, *args, &block)
+              retries = 0
               trace(Ext::SPAN_EXEC_PREPARED, statement_name: statement_name, block: block) do |_, wrapped_block|
                 super(statement_name, params, *args, &wrapped_block)
+              end
+            rescue PG::ConnectionBad => error
+              puts "retrying #{retries}"
+              if retries < 3
+                retries += 1
+                sleep(2 ** (retries))
+                retry
+              else
+                raise error
               end
             end
 
